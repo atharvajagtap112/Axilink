@@ -38,9 +38,7 @@ class RemoteControlClient:
     def __init__(self):
         """Initialize the Axilink Desktop Client"""
         self.SERVER_WS_URL = f"ws://{ip}:8080/ws"
-        # self.SERVER_WS_URL = (
-        #     "wss://axilink-backend-baf7fgfpdca5gcdf.eastus-01.azurewebsites.net/ws"
-        # )
+       
         self.session_code = None
         self.ws = None
         self.is_connected = False
@@ -108,7 +106,7 @@ class RemoteControlClient:
     def generate_qr_code(self, code):
         """Generate QR code for the session"""
         qr_data = code + f"ws://{ip}:8080/ws"
-        # qr_data = code +f"wss://axilink-backend-baf7fgfpdca5gcdf.eastus-01.azurewebsites.net/ws"
+       
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
