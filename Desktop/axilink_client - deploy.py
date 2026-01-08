@@ -15,10 +15,12 @@ import base64
 import os
 import sys
 import traceback
-
+from dotenv import load_dotenv
 # Disable PyAutoGUI failsafe for smoother operation
 pyautogui.FAILSAFE = False
+load_dotenv(r".env")
 
+cloud_ip = os.getenv("KEY")
 
 def get_local_ip():
     """Get local IP address for WebSocket server"""
@@ -34,13 +36,18 @@ def get_local_ip():
 
 
 ip = get_local_ip()
+
+
 class RemoteControlClient:
     def __init__(self):
-        """Initialize the Axilink Desktop Client"""
-        self.SERVER_WS_URL = f"ws://{ip}:8080/ws"
-        # self.SERVER_WS_URL = (
-        #     "wss://axilink-backend-baf7fgfpdca5gcdf.eastus-01.azurewebsites.net/ws"
-        # )
+        # """Initialize the Axilink Desktop Client"""
+        self.LOCAL_WS_URL = f"ws://{ip}:8080/ws"
+        self.CLOUD_WS_URL = cloud_ip
+
+        # Default to cloud mode
+        self.use_cloud = True
+        self.SERVER_WS_URL = self.CLOUD_WS_URL
+
         self.session_code = None
         self.ws = None
         self.is_connected = False
@@ -62,7 +69,7 @@ class RemoteControlClient:
         self.adaptive_frame_skip = True
         self.last_frame_duration = 0
 
-        # HARDCODED: Touch coordinate mapping options based on calibration
+        # HARDCODED:  Touch coordinate mapping options based on calibration
         self.flip_x_coordinates = False
         self.flip_y_coordinates = False
 
@@ -107,8 +114,13 @@ class RemoteControlClient:
 
     def generate_qr_code(self, code):
         """Generate QR code for the session"""
-        qr_data = code + f"ws://{ip}:8080/ws"
-        # qr_data = code +f"wss://axilink-backend-baf7fgfpdca5gcdf.eastus-01.azurewebsites.net/ws"
+        # If using cloud, only pass the code
+        if self.use_cloud:
+            qr_data = code
+        else:
+            # If using local WiFi, append the local WebSocket URL
+            qr_data = code + self.LOCAL_WS_URL
+
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -119,6 +131,51 @@ class RemoteControlClient:
         qr.make(fit=True)
         img = qr.make_image(fill_color="black", back_color="white")
         return img
+
+    def toggle_connection_mode(self):
+        """Toggle between local WiFi and cloud connection"""
+        # Disconnect current connection if active
+        was_connected = self.is_connected
+        if self.ws:
+            try:
+                self.ws.close()
+            except:
+                pass
+            self.is_connected = False
+            time.sleep(0.5)
+
+        # Stop screen mirroring if active
+        if self.mode == "mirror":
+            self.stop_screen_mirroring()
+
+        # Toggle the mode
+        self.use_cloud = not self.use_cloud
+
+        # Update the SERVER_WS_URL
+        if self.use_cloud:
+            self.SERVER_WS_URL = self.CLOUD_WS_URL
+            self.connection_mode_btn.config(text="☁️ Cloud Mode", bg='#3498db')
+            self.status_label.config(text="☁️ Switched to Cloud Mode", fg='#3498db')
+            mode_text = "Cloud"
+        else:
+            self.SERVER_WS_URL = self.LOCAL_WS_URL
+            self.connection_mode_btn.config(text="📶 Local WiFi", bg='#9b59b6')
+            self.status_label.config(text="📶 Switched to Local WiFi", fg='#9b59b6')
+            mode_text = "Local WiFi"
+
+        # Update the info label
+        self.info_label.config(
+            text=f"Mode: {mode_text} | WebSocket: {self.SERVER_WS_URL.replace('ws://', '').replace('wss://', '')}")
+
+        # If QR was already generated, regenerate with new mode
+        if self.qr_generated:
+            qr_img = self.generate_qr_code(self.session_code)
+            self.update_display(self.session_code, qr_img)
+            self.update_debug(f"Switched to {mode_text} - QR updated")
+
+            # Reconnect if we were previously connected
+            if was_connected:
+                self.connect_websocket()
 
     def test_center_point(self):
         """Move cursor to center of selected monitor to test mapping"""
@@ -148,7 +205,7 @@ class RemoteControlClient:
             canvas.pack(fill=tk.BOTH, expand=True)
             canvas.create_oval(2, 2, size - 2, size - 2, fill='red', outline='white', width=2)
 
-            # Automatically close after 1.5 seconds
+            # Automatically close after 1. 5 seconds
             indicator.after(1500, indicator.destroy)
 
         except Exception as e:
@@ -159,7 +216,7 @@ class RemoteControlClient:
         """Set up the Tkinter GUI with scrolling functionality"""
         self.root.deiconify()  # Show the window now
         self.root.title("Axilink Desktop Client")
-        self.root.geometry("400x550")  # Slightly larger for advanced settings
+        self.root.geometry("400x600")  # Increased height for new button
         self.root.configure(bg='#2c3e50')
         self.root.attributes('-topmost', False)  # Set to False to avoid interfering with screen mirroring
 
@@ -195,6 +252,21 @@ class RemoteControlClient:
         title_label = tk.Label(scrollable_frame, text="Axilink Desktop Client", font=("Arial", 18, "bold"),
                                bg='#2c3e50', fg='white')
         title_label.pack(pady=15)
+
+        # Connection Mode Toggle Button (at the top)
+        self.connection_mode_btn = tk.Button(
+            scrollable_frame,
+            text="☁️ Cloud Mode",
+            command=self.toggle_connection_mode,
+            bg='#3498db',
+            fg='white',
+            font=("Arial", 11, "bold"),
+            padx=15,
+            pady=8,
+            relief='flat',
+            cursor='hand2'
+        )
+        self.connection_mode_btn.pack(pady=10)
 
         self.code_label = tk.Label(scrollable_frame, text="", font=("Arial", 28, "bold"),
                                    bg='#34495e', fg='#ecf0f1', padx=20, pady=10, relief='raised', bd=2)
@@ -293,10 +365,10 @@ class RemoteControlClient:
                                 font=("Arial", 10), bg='#2c3e50', fg='#bdc3c7', justify=tk.CENTER)
         instructions.pack(pady=10)
 
-        info_label = tk.Label(scrollable_frame,
-                              text=f"WebSocket: {self.SERVER_WS_URL.replace('ws://', '')}",
-                              font=("Arial", 8), bg='#2c3e50', fg='#7f8c8d')
-        info_label.pack(pady=5)
+        self.info_label = tk.Label(scrollable_frame,
+                                   text=f"Mode: Cloud | WebSocket: {self.SERVER_WS_URL.replace('wss://', '')}",
+                                   font=("Arial", 8), bg='#2c3e50', fg='#7f8c8d')
+        self.info_label.pack(pady=5)
 
         # Add calibration status label
         calib_status = tk.Label(scrollable_frame,
@@ -306,14 +378,14 @@ class RemoteControlClient:
 
         # Performance monitor label
         self.perf_label = tk.Label(scrollable_frame,
-                                   text="Performance: Waiting for data...",
+                                   text="Performance:  Waiting for data...",
                                    font=("Arial", 8), bg='#2c3e50', fg='#7f8c8d')
         self.perf_label.pack(pady=2)
 
         # Add debug log frame
         debug_frame = tk.Frame(scrollable_frame, bg='#2c3e50')
         debug_frame.pack(pady=5, fill=tk.X, padx=10)
-        self.debug_label = tk.Label(debug_frame, text="Debug: Ready",
+        self.debug_label = tk.Label(debug_frame, text="Debug:  Ready",
                                     font=("Courier", 8), bg='#34495e', fg='#95a5a6',
                                     anchor='w', justify=tk.LEFT)
         self.debug_label.pack(fill=tk.X)
@@ -376,7 +448,7 @@ class RemoteControlClient:
                     # Important: Using a lambda with default argument to capture the current value of i
                     btn = tk.Radiobutton(
                         self.monitor_buttons_frame,
-                        text=f"Screen {i}: {size_text}",
+                        text=f"Screen {i}:  {size_text}",
                         variable=self.monitor_var,
                         value=i,
                         command=lambda idx=i: self.select_monitor(idx),
@@ -391,7 +463,7 @@ class RemoteControlClient:
         except Exception as e:
             error_msg = f"Error detecting monitors: {str(e)[:100]}"
             self.update_debug(error_msg)
-            print(f"[ERROR] Detecting monitors: {e}")
+            print(f"[ERROR] Detecting monitors:  {e}")
 
     def select_monitor(self, idx):
         """Handle monitor selection"""
@@ -411,10 +483,10 @@ class RemoteControlClient:
                 self.monitor_aspect_ratio = monitor['width'] / monitor['height']
 
                 self.update_debug(
-                    f"Selected monitor {idx}: {monitor['width']}x{monitor['height']} at ({monitor['left']},{monitor['top']})")
+                    f"Selected monitor {idx}:  {monitor['width']}x{monitor['height']} at ({monitor['left']},{monitor['top']})")
         except Exception as e:
             print(f"[ERROR] Failed to get monitor details: {e}")
-            self.update_debug(f"Error: {str(e)[:40]}")
+            self.update_debug(f"Error:  {str(e)[:40]}")
 
         # If we're currently mirroring, restart with new monitor
         if self.mode == "mirror" and self.screen_thread and self.screen_thread.is_alive():
@@ -448,12 +520,12 @@ class RemoteControlClient:
     def generate_new_code(self):
         """Generate a new session code and QR code"""
         if self.qr_generated:
-            self.status_label.config(text="⚠️ QR Code already generated! Use existing code.", fg='#f39c12')
+            self.status_label.config(text="⚠️ QR Code already generated!  Use existing code.", fg='#f39c12')
             return
         self.session_code = self.generate_session_code()
         qr_img = self.generate_qr_code(self.session_code)
         self.update_display(self.session_code, qr_img)
-        self.status_label.config(text="✅ QR Code Ready - Waiting for connection...", fg='#f39c12')
+        self.status_label.config(text="✅ QR Code Ready - Waiting for connection.. .", fg='#f39c12')
         self.qr_generated = True
         self.connect_websocket()
 
@@ -526,7 +598,7 @@ class RemoteControlClient:
 
             # Subscribe to move topic (mouse/keyboard)
             move_topic = f'/topic/move/{self.session_code}'
-            ws.send(f'SUBSCRIBE\nid:0\ndestination:{move_topic}\n\n\u0000')
+            ws.send(f'SUBSCRIBE\nid: 0\ndestination:{move_topic}\n\n\u0000')
             print(f"[INFO] Subscribed to {move_topic}")
             time.sleep(0.1)  # Small delay between subscriptions
 
@@ -568,7 +640,7 @@ class RemoteControlClient:
             # Find headers and body more reliably
             null_terminator_pos = message.rfind("\u0000")
             if null_terminator_pos > 0:
-                message = message[:null_terminator_pos]
+                message = message[: null_terminator_pos]
 
             # Find header/body separator (empty line)
             parts = message.split("\n\n", 1)
@@ -649,7 +721,7 @@ class RemoteControlClient:
         """Process a touch event with improved handling"""
         try:
             # Print incoming coordinates
-            print(f"[INFO] Processing touch: {click_type} at ({x_percent:.4f}, {y_percent:.4f})")
+            print(f"[INFO] Processing touch:  {click_type} at ({x_percent:.4f}, {y_percent:.4f})")
 
             # If accuracy test is active, use test handler
             if hasattr(self, 'accuracy_test_active') and self.accuracy_test_active and hasattr(self,
@@ -698,10 +770,10 @@ class RemoteControlClient:
             try:
                 data = json.loads(body)
             except json.JSONDecodeError as e:
-                print(f"[ERROR] JSON parse error: {e} for body: {body[:50]}...")
+                print(f"[ERROR] JSON parse error: {e} for body: {body[: 50]}...")
                 return
 
-            # TOPIC: Screen mirroring
+            # TOPIC:  Screen mirroring
             if f"/topic/screen/{self.session_code}" in destination:
                 # Received a screen frame
                 if "image" in data:
@@ -713,7 +785,7 @@ class RemoteControlClient:
                     quality = data.get('quality', 95)
                     resize_factor = data.get('resize', 1.0)
 
-                    print(f"[INFO] OCR screenshot requested:  Q={quality}, Resize={resize_factor}")
+                    print(f"[INFO] OCR screenshot requested:   Q={quality}, Resize={resize_factor}")
                     self.update_debug("Capturing OCR screenshot...")
 
                     # Capture high-quality screenshot
@@ -764,7 +836,7 @@ class RemoteControlClient:
 
                         self.ws.send(stomp_response)
 
-                        print(f"[INFO] Sent OCR screenshot:  {len(img_bytes) / 1024:.1f}KB")
+                        print(f"[INFO] Sent OCR screenshot:   {len(img_bytes) / 1024:.1f}KB")
                         self.update_debug(f"OCR screenshot sent: {len(img_bytes) / 1024:.1f}KB")
 
                 except Exception as e:
@@ -775,11 +847,11 @@ class RemoteControlClient:
             # TOPIC: Mode selection
             if f"/topic/mode/{self.session_code}" in destination:
                 mode_val = data.get("mode")
-                print(f"[INFO] Mode change: {mode_val}")
+                print(f"[INFO] Mode change:  {mode_val}")
 
                 if mode_val == "mirror":
                     self.mode = "mirror"
-                    self.status_label.config(text="🖥️ Mirroring screen to client...", fg="#3498db")
+                    self.status_label.config(text="🖥️ Mirroring screen to client.. .", fg="#3498db")
                     self.start_screen_mirroring()
                     return
 
@@ -803,7 +875,7 @@ class RemoteControlClient:
                     else:
                         # Try to find other keys that might contain the coordinates
                         keys = list(data.keys())
-                        print(f"[WARN] Missing xPercent/yPercent. Available keys: {keys}")
+                        print(f"[WARN] Missing xPercent/yPercent.  Available keys: {keys}")
 
                         # Look for alternate keys
                         x_key = next((k for k in keys if 'x' in k.lower()), None)
@@ -909,8 +981,8 @@ class RemoteControlClient:
 
                 # Print monitor info for debugging
                 print(
-                    f"[INFO] Mirroring monitor {monitor_idx}: {monitor['width']}x{monitor['height']} at ({monitor['left']},{monitor['top']})")
-                self.update_debug(f"Mirroring: {monitor['width']}x{monitor['height']}")
+                    f"[INFO] Mirroring monitor {monitor_idx}:  {monitor['width']}x{monitor['height']} at ({monitor['left']},{monitor['top']})")
+                self.update_debug(f"Mirroring:  {monitor['width']}x{monitor['height']}")
 
                 # Get quality settings
                 try:
@@ -962,7 +1034,7 @@ class RemoteControlClient:
 
                 print("[INFO] Starting optimized screen mirroring thread")
                 self.status_label.config(text=f"🖥️ Mirroring screen {monitor_idx}", fg="#3498db")
-                self.update_debug(f"Starting: {new_width}x{new_height}, Q:{quality}%")
+                self.update_debug(f"Starting:  {new_width}x{new_height}, Q:{quality}%")
 
                 # Main loop for screen mirroring
                 while not self.stop_screen_thread.is_set():
@@ -1091,7 +1163,7 @@ class RemoteControlClient:
 
                                 # Update performance monitor label with more detailed info
                                 perf_text = (f"Performance: {current_fps:.1f} FPS, "
-                                             f"Frame: {total_time * 1000:.0f}ms, "
+                                             f"Frame:  {total_time * 1000:.0f}ms, "
                                              f"Capture: {capture_time * 1000:.0f}ms, "
                                              f"Send: {send_time * 1000:.0f}ms, "
                                              f"Size: {kb_size:.1f}KB")
@@ -1121,7 +1193,7 @@ class RemoteControlClient:
 
                     except Exception as e:
                         error_message = f"Mirror error: {str(e)[:40]}"
-                        print(f"[ERROR] Mirroring: {e}")
+                        print(f"[ERROR] Mirroring:  {e}")
                         traceback.print_exc()
                         self.update_debug(error_message)
                         self.consecutive_errors += 1
@@ -1136,7 +1208,7 @@ class RemoteControlClient:
         except Exception as e:
             print(f"[ERROR] Screen mirroring thread fatal error: {e}")
             traceback.print_exc()
-            self.update_debug(f"Fatal error: {str(e)[:40]}")
+            self.update_debug(f"Fatal error:  {str(e)[:40]}")
 
         print("[INFO] Screen mirroring thread stopped")
         self.update_debug("Screen mirroring stopped")
@@ -1190,12 +1262,16 @@ class RemoteControlClient:
         print("[INFO] Connected to WebSocket")
         self.is_connected = True
         self.consecutive_errors = 0
-        self.status_label.config(text="🔗 Connected to server", fg='#27ae60')
+
+        # Update status with appropriate mode indicator
+        mode_text = "☁️ Cloud" if self.use_cloud else "📶 Local WiFi"
+        self.status_label.config(text=f"🔗 Connected to server ({mode_text})", fg='#27ae60')
+
         threading.Thread(target=self.subscribe_to_topics, args=(ws,)).start()
 
     def on_error(self, ws, error):
         """Handle WebSocket error"""
-        print(f"[ERROR] WebSocket: {error}")
+        print(f"[ERROR] WebSocket:  {error}")
         self.status_label.config(text="❌ Connection error", fg='#e74c3c')
 
     def on_close(self, ws, close_status_code, close_msg):
@@ -1215,9 +1291,9 @@ class RemoteControlClient:
         # Reconnect after a delay, but only if we haven't manually closed it
         if close_status_code not in (1000, None):  # Not a normal closure
             print("[INFO] Attempting to reconnect in 3 seconds...")
-            self.update_debug(f"Connection lost: {close_status_code}. Reconnecting...")
+            self.update_debug(f"Connection lost:  {close_status_code}. Reconnecting...")
 
-            # Schedule reconnect (use root.after to avoid threading issues)
+            # Schedule reconnect (use root. after to avoid threading issues)
             self.root.after(3000, self.connect_websocket)
         else:
             self.update_debug("Connection closed normally")
@@ -1251,10 +1327,11 @@ if __name__ == "__main__":
     try:
         # Print startup information
         print("=" * 60)
-        print("Axilink Desktop Client v1.1")
+        print("Axilink Desktop Client v1.2")
         print("=" * 60)
-        print(f"Python: {sys.version}")
+        print(f"Python:  {sys.version}")
         print(f"Started: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Local IP: {ip}")
         print("-" * 60)
 
         # Check for required packages
@@ -1286,6 +1363,6 @@ if __name__ == "__main__":
         try:
             import tkinter.messagebox as messagebox
 
-            messagebox.showerror("Fatal Error", f"An error occurred: {str(e)}\nCheck axilink_error.log for details.")
+            messagebox.showerror("Fatal Error", f"An error occurred:  {str(e)}\nCheck axilink_error.log for details.")
         except:
             pass
