@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:air_pointer/Services/azur_config.dart';
+
+import 'package:air_pointer/Services/azure_config.dart';
 import 'package:http/http.dart' as http;
 
 /// Improved Azure Computer Vision Service using Read API (better accuracy)

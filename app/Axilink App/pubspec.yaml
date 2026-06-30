@@ -35,7 +35,7 @@ dependencies:
   web_socket_channel: ^2.4.0
   cupertino_icons: ^1.0.8
   flutter_dotenv: ^5.1.0
-  
+  provider:
   flutter_lints: ^5.0.0
   mobile_scanner: ^7.0.1
   get: ^4.7.2
@@ -43,12 +43,15 @@ dependencies:
 
     
   # Azure AI Services Dependencies
-  http: 
-  permission_handler: 
-  record: 
-  path_provider: 
-  flutter_tts: 
-  audioplayers: 
+  http:
+  permission_handler:
+  record:
+  path_provider:
+  flutter_tts:
+  audioplayers:
+
+  # On-device OCR (replaces Azure Vision for text extraction)
+  google_mlkit_text_recognition: ^0.13.0
  
 
 dev_dependencies:

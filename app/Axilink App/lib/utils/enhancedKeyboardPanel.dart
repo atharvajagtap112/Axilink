@@ -8,11 +8,11 @@ class BasicKeyboard extends StatefulWidget {
   final VoidCallback onClose;
 
   const BasicKeyboard({
-    Key? key,
+    super.key,
     required this.stompClient,
     required this.sessionCode,
     required this.onClose,
-  }) : super(key: key);
+  });
 
   @override
   State<BasicKeyboard> createState() => _BasicKeyboardState();
@@ -112,7 +112,7 @@ class _BasicKeyboardState extends State<BasicKeyboard> {
             height: 25,
             margin: const EdgeInsets.all(1),
             decoration: BoxDecoration(
-              color: Colors.grey.shade800.withOpacity(0.5),
+              color: Colors.grey.shade800.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(3),
             ),
             alignment: Alignment.center,
@@ -138,8 +138,8 @@ class _BasicKeyboardState extends State<BasicKeyboard> {
         margin: const EdgeInsets.all(1),
         decoration: BoxDecoration(
           color: keyValue == "enter" 
-              ? Colors.blueAccent.withOpacity(0.5)
-              : Colors.grey.shade800.withOpacity(0.5),
+              ? Colors.blueAccent.withValues(alpha: 0.5)
+              : Colors.grey.shade800.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(3),
         ),
         alignment: Alignment.center,

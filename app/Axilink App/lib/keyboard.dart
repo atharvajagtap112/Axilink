@@ -7,7 +7,8 @@ import 'package:stomp_dart_client/stomp.dart';
 class KeyboardScreen extends StatefulWidget {
   final StompClient stompClient;
   final String code;
-  const KeyboardScreen({super.key, required this.stompClient,required this.code, required bool isActive});
+  final VoidCallback onBack;
+  const KeyboardScreen({super.key, required this.stompClient,required this.code, required bool isActive, required this.onBack});
 
   @override
   State<KeyboardScreen> createState() => _KeyboardScreenState();
@@ -79,7 +80,7 @@ class _KeyboardScreenState extends State<KeyboardScreen> with WidgetsBindingObse
   void _sendTypingAction(String text) {
     if (widget.stompClient.connected) {
       widget.stompClient.send(
-        destination: url!,
+        destination: url,
         body: jsonEncode({"action": "type", "text": text}),
       );
     }
@@ -88,7 +89,7 @@ class _KeyboardScreenState extends State<KeyboardScreen> with WidgetsBindingObse
   void _sendBackspaceAction() {
     if (widget.stompClient.connected) {
       widget.stompClient.send(
-        destination: url!,
+        destination: url,
         body: jsonEncode({"action": "backspace"}),
       );
     }
@@ -97,7 +98,7 @@ class _KeyboardScreenState extends State<KeyboardScreen> with WidgetsBindingObse
   void _sendEnterAction() {
     if (widget.stompClient.connected) {
       widget.stompClient.send(
-        destination: url!,
+        destination: url,
         body: jsonEncode({"action": "enter"}),
       );
     }
@@ -140,9 +141,9 @@ class _KeyboardScreenState extends State<KeyboardScreen> with WidgetsBindingObse
     
     return WillPopScope(
       onWillPop: () async {
-        // Prevent back button from closing keyboard
-        _openKeyboard();
-        return false; // Prevent navigation back
+        // Call the back callback when back button is pressed
+        widget.onBack();
+        return false; // Prevent default back behavior
       },
       child: KeyboardListener(
         focusNode: FocusNode(),
@@ -180,7 +181,7 @@ class _KeyboardScreenState extends State<KeyboardScreen> with WidgetsBindingObse
                       padding: const EdgeInsets.all(24),
                       margin: const EdgeInsets.symmetric(horizontal: 24),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2A2A2A).withOpacity(0.8),
+                        color: const Color(0xFF2A2A2A).withValues(alpha: 0.8),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: const Color(0xFF3A3A3A),
@@ -188,7 +189,7 @@ class _KeyboardScreenState extends State<KeyboardScreen> with WidgetsBindingObse
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
+                            color: Colors.black.withValues(alpha: 0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 6),
                           ),
@@ -228,10 +229,10 @@ class _KeyboardScreenState extends State<KeyboardScreen> with WidgetsBindingObse
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF64B5F6).withOpacity(0.1),
+                              color: const Color(0xFF64B5F6).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: const Color(0xFF64B5F6).withOpacity(0.3),
+                                color: const Color(0xFF64B5F6).withValues(alpha: 0.3),
                                 width: 1,
                               ),
                             ),

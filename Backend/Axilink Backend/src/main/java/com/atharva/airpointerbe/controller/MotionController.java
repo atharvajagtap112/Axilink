@@ -9,7 +9,6 @@ import com.atharva.airpointerbe.Model.TouchEventMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -110,10 +109,7 @@ public class MotionController {
 
     @MessageMapping("/touch/{code}")
     public void receiveTouch(@DestinationVariable String code,
-                             @Payload String rawPayload,  // Add this to see raw JSON
                              TouchEventMessage touchEvent) {
-
-
 
         messagingTemplate.convertAndSend("/topic/touch/"+code, Map.of(
                 "xPercent",touchEvent.getXPercent(),

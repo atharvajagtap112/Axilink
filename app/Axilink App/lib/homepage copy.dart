@@ -1,7 +1,6 @@
 import 'package:air_pointer/keyboard.dart';
 import 'package:air_pointer/mouse_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:network_info_plus/network_info_plus.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
@@ -148,12 +147,12 @@ class _HomepageState extends State<Homepage> {
                   MouseController(
                     stompClient: stompClient, 
                     code: widget.code,
-                    isActive: _currentPage == 0, // Mouse is active when on page 0
+                    isActive: _currentPage == 0, onBack: () {  }, // Mouse is active when on page 0
                   ),
                   KeyboardScreen(
                     stompClient: stompClient!, 
                     code: widget.code,
-                    isActive: _currentPage == 1, // Keyboard is active when on page 1
+                    isActive: _currentPage == 1, onBack: () {  }, // Keyboard is active when on page 1
                   ),
                 ],
               ),

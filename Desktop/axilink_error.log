@@ -1,0 +1,14 @@
+
+[2026-03-18 05:54:58] Fatal error: name 'RemoteControlClient' is not defined
+Traceback (most recent call last):
+  File "F:\Axilink\Desktop\axilink_client - deploy.py", line 1354, in <module>
+    client = RemoteControlClient()
+             ^^^^^^^^^^^^^^^^^^^
+NameError: name 'RemoteControlClient' is not defined
+
+[2026-03-18 05:59:05] Fatal error: name 'RemoteControlClient' is not defined
+Traceback (most recent call last):
+  File "F:\Axilink\Desktop\axilink_client - deploy.py", line 1354, in <module>
+    client = RemoteControlClient()
+             ^^^^^^^^^^^^^^^^^^^
+NameError: name 'RemoteControlClient' is not defined

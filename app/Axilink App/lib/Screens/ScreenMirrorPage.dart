@@ -1,14 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:air_pointer/utils/enhancedKeyboardPanel.dart';
 import 'package:air_pointer/widgets/ocr_overlay_widget.dart';
 import 'package:air_pointer/widgets/voice_control_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:stomp_dart_client/stomp.dart';
-import 'package:stomp_dart_client/stomp_handler.dart';
 
 class ScreenMirrorPage extends StatefulWidget {
   final String sessionCode;
@@ -16,11 +14,11 @@ class ScreenMirrorPage extends StatefulWidget {
   final VoidCallback onBack;
 
   const ScreenMirrorPage({
-    Key? key,
+    super.key,
     required this.sessionCode,
     required this.stompClient,
     required this.onBack,
-  }) : super(key: key);
+  });
 
   @override
   State<ScreenMirrorPage> createState() => _ScreenMirrorPageState();
@@ -248,12 +246,65 @@ class _ScreenMirrorPageState extends State<ScreenMirrorPage> {
     }
   }
 
+  /// Converts a pointer position within the full touch area into percentage
+  /// coordinates relative to the ACTUAL displayed image, accounting for the
+  /// letterbox/pillarbox introduced by BoxFit.contain.
+  ///
+  /// This is what makes touch mapping work on any phone size and any desktop
+  /// monitor aspect ratio: instead of measuring against the whole screen, we
+  /// measure against the real image rectangle, so no per-device scaling factor
+  /// is required.
+  ///
+  /// Returns null when the touch lands in the black bars (outside the image).
+  Offset? _mapToImagePercent(Offset localPosition, Size areaSize) {
+    final containerW = areaSize.width;
+    final containerH = areaSize.height;
+    if (containerW <= 0 || containerH <= 0) return null;
+
+    final containerAspect = containerW / containerH;
+
+    // Work out the size of the image as laid out by BoxFit.contain.
+    double displayW;
+    double displayH;
+    if (containerAspect > _aspectRatio) {
+      // Container is wider than the image -> pillarbox (bars left/right).
+      displayH = containerH;
+      displayW = containerH * _aspectRatio;
+    } else {
+      // Container is taller than the image -> letterbox (bars top/bottom).
+      displayW = containerW;
+      displayH = containerW / _aspectRatio;
+    }
+
+    // The image is centered, so the bars on each side are half the leftover.
+    final offsetX = (containerW - displayW) / 2;
+    final offsetY = (containerH - displayH) / 2;
+
+    final imageX = localPosition.dx - offsetX;
+    final imageY = localPosition.dy - offsetY;
+
+    // Ignore touches that fall in the black bars (outside the actual image).
+    if (imageX < 0 || imageX > displayW || imageY < 0 || imageY > displayH) {
+      return null;
+    }
+
+    final xPercent = (imageX / displayW).clamp(0.0, 1.0);
+    final yPercent = (imageY / displayH).clamp(0.0, 1.0);
+    return Offset(xPercent, yPercent);
+  }
+
   void _sendTouchEvent(Offset localPosition, Size size, String clickType) {
     try {
-      final xPercent = localPosition.dx / size.width;
-      final yPercent = localPosition.dy / size.height;
+      final percent = _mapToImagePercent(localPosition, size);
+      if (percent == null) {
+        // Touch landed in the letterbox area; there's nothing to click.
+        print('Ignoring touch in letterbox area: $localPosition on $size');
+        return;
+      }
+      final xPercent = percent.dx;
+      final yPercent = percent.dy;
       print('Sending touch event: $clickType at ($xPercent, $yPercent)');
-      print('Touch position: ${localPosition.dx}x${localPosition.dy} on screen ${size.width}x${size.height}');
+      print('Touch position: ${localPosition.dx}x${localPosition.dy} on area ${size.width}x${size.height}');
       widget.stompClient.send(
         destination: '/app/touch/${widget.sessionCode}',
         body: jsonEncode({
@@ -345,7 +396,13 @@ class _ScreenMirrorPageState extends State<ScreenMirrorPage> {
   }
 
   Widget _buildScreenView() {
-    return Stack(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The exact size of the touch area. Pointer localPositions reported by
+        // the Listener below are relative to this same box, so touch math lines
+        // up regardless of device size or safe-area insets.
+        final areaSize = Size(constraints.maxWidth, constraints.maxHeight);
+        return Stack(
       children: [
         // Main screen image
         Center(
@@ -436,8 +493,7 @@ class _ScreenMirrorPageState extends State<ScreenMirrorPage> {
                   !_isScrolling && 
                   endTime.difference(_touchStartTime!) < _tapTimeout) {
                 
-                final renderBox = context.findRenderObject() as RenderBox;
-                _sendTouchEvent(event.localPosition, renderBox.size, 'left_click');
+                _sendTouchEvent(event.localPosition, areaSize, 'left_click');
               }
               
               // Reset state
@@ -606,8 +662,8 @@ if (_showOcrOverlay && _imageBytes != null)
           Container(
             decoration: BoxDecoration(
               color: isActive 
-                  ? (badgeColor ?? Colors.blueAccent).withOpacity(0.8)
-                  : Colors.black.withOpacity(0.5),
+                  ? (badgeColor ?? Colors.blueAccent).withValues(alpha: 0.8)
+                  : Colors.black.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(8),
               border: isActive 
                   ? Border.all(color: badgeColor ?? Colors.blueAccent, width: 2)

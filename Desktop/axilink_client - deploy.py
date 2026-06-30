@@ -16,7 +16,7 @@ import os
 import sys
 import traceback
 from dotenv import load_dotenv
-# Disable PyAutoGUI failsafe for smoother operation
+
 pyautogui.FAILSAFE = False
 load_dotenv(r".env")
 
@@ -79,47 +79,45 @@ class RemoteControlClient:
         self.offset_x = 0.0  # X offset = 0.00
         self.offset_y = 0.0  # Y offset = 0.00
 
-        # Create the root window first
+
         self.root = tk.Tk()
-        self.root.withdraw()  # Hide it for now
+        self.root.withdraw()
 
-        # Now we can safely create Tkinter variables
-        self.monitor_var = tk.IntVar(value=1)  # Default to first monitor
-        self.quality_var = tk.IntVar(value=65)  # Default to 65% quality - lower for better performance
-        self.fps_var = tk.IntVar(value=15)  # Default to 15 FPS - higher for smoother experience
 
-        # Advanced settings with better defaults
-        self.resize_factor_var = tk.DoubleVar(value=0.5)  # Default resize to 50%
-        self.enable_adaptive_quality = tk.BooleanVar(value=True)  # Enable adaptive quality by default
+        self.monitor_var = tk.IntVar(value=1)
+        self.quality_var = tk.IntVar(value=65)
+        self.fps_var = tk.IntVar(value=15)
 
-        # Initialization for adaptive quality
-        self.target_size_kb = 150  # Target size in KB
-        self.min_quality = 40  # Minimum quality level
-        self.max_quality = 85  # Maximum quality level
-        self.current_quality = 65  # Starting quality
+        self.resize_factor_var = tk.DoubleVar(value=0.5)
+        self.enable_adaptive_quality = tk.BooleanVar(value=True)
 
-        # Default monitor selection
+
+        self.target_size_kb = 150
+        self.min_quality = 40
+        self.max_quality = 85
+        self.current_quality = 65
+
+
         self.selected_monitor = 1
 
-        # Get screen dimensions for aspect ratio calculations
+
         self.screen_width, self.screen_height = pyautogui.size()
         self.screen_aspect_ratio = self.screen_width / self.screen_height
 
-        # Create an in-memory buffer for image processing
+
         self.img_buffer = BytesIO()
 
     def generate_session_code(self):
-        """Generate a random 4-digit session code"""
+
         return str(random.randint(1000, 9999))
 
     def generate_qr_code(self, code):
-        """Generate QR code for the session"""
-        # If using cloud, only pass the code
+
         if self.use_cloud:
             qr_data = code
         else:
-            # If using local WiFi, append the local WebSocket URL
-            qr_data = code + self.LOCAL_WS_URL
+
+            qr_data = code+ip
 
         qr = qrcode.QRCode(
             version=1,
@@ -133,8 +131,7 @@ class RemoteControlClient:
         return img
 
     def toggle_connection_mode(self):
-        """Toggle between local WiFi and cloud connection"""
-        # Disconnect current connection if active
+
         was_connected = self.is_connected
         if self.ws:
             try:
@@ -793,11 +790,14 @@ class RemoteControlClient:
                         monitor = sct.monitors[self.selected_monitor]
                         sct_img = sct.grab(monitor)
 
-                        # Convert to PIL with numpy if available
+
                         try:
                             import numpy as np
                             img_array = np.array(sct_img)
-                            img = Image.fromarray(img_array)
+                            img_array = img_array[:, :, :3][:, :, ::-1]
+                            img = Image.fromarray(img_array, "RGB")
+                            if img.mode == "RGBA":
+                                img = img.convert("RGB")
                         except ImportError:
                             img = Image.frombytes("RGB", sct_img.size, sct_img.rgb)
 
@@ -1086,7 +1086,11 @@ class RemoteControlClient:
                             # Faster conversion using numpy when available
                             import numpy as np
                             img_array = np.array(sct_img)
-                            img = Image.fromarray(img_array)
+                            img_array = img_array[:, :, :3][:, :, ::-1]
+                            img = Image.fromarray(img_array, "RGB")
+
+                            if img.mode == "RGBA":
+                                img = img.convert("RGB")
                         except ImportError:
                             # Fallback to standard conversion
                             img = Image.frombytes("RGB", sct_img.size, sct_img.rgb)

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 class OptimizedImageView extends StatelessWidget {
   final Uint8List imageData;
   
-  const OptimizedImageView({Key? key, required this.imageData}) : super(key: key);
+  const OptimizedImageView({super.key, required this.imageData});
   
   @override
   Widget build(BuildContext context) {

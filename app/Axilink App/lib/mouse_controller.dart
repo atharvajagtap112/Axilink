@@ -2,19 +2,17 @@ import 'dart:async';
 
 
 import 'package:flutter/material.dart';
-import 'package:get/state_manager.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:stomp_dart_client/stomp.dart';
-import 'package:stomp_dart_client/stomp_config.dart';
-import 'package:stomp_dart_client/stomp_frame.dart';
 import 'dart:convert';
 
 class MouseController extends StatefulWidget {
-  const MouseController({super.key, this.stompClient, required this.code,required this.isActive});
+  const MouseController({super.key, this.stompClient, required this.code, required this.isActive, required this.onBack});
   
   final StompClient? stompClient;
   final String code;
   final bool isActive;
+  final VoidCallback onBack;
   @override
   State<MouseController> createState() => _HomePagestate();
 }
@@ -30,36 +28,18 @@ class _HomePagestate extends State<MouseController> {
       stompClient = widget.stompClient;
       url='/app/move/${widget.code}';
       
-    // if(stompClient == null) {
-    //   _connectStomp();
-    // }
-   
+    
     _startGyroStream();
    
   }
 
-  // void _connectStomp() {
-  //   stompClient = StompClient(
-  //     config: StompConfig(
-  //       url: 'ws://192.168.0.101:8080/ws',
-  //       onConnect: onConnectCallback,
-  //       onWebSocketError: (dynamic error) => print('WebSocket Error: $error'),
-  //       stompConnectHeaders: {},
-  //       webSocketConnectHeaders: {},
-  //     ),
-  //   );
-
-  //   stompClient!.activate();
-  // }
-
-  // void onConnectCallback(StompFrame frame) {
-  //   print('Connected to WebSocket!');
-  // }
-
-  // For Timer
 
   void _startGyroStream() {
-   double threshold = 0.05; // Lower threshold for more responsive movement
+    double alpha = 0.2; // smoothing factor
+
+double smoothDx = 0;
+double smoothDy = 0;
+   double threshold = 0.02; // Lower threshold for more responsive movement
    double sensitivity = 8.0;
     Timer? sendTimer;
     double? lastDx;
@@ -75,9 +55,7 @@ class _HomePagestate extends State<MouseController> {
       double dx = event.y * sensitivity;
       double dy = event.x * sensitivity;
 
-      double acceleration = (dx.abs() > 1.0 || dy.abs() > 1.0) ? 1.5 : 1.0;
-dx *= acceleration;
-dy *= acceleration;
+     
     //  print("threshold: $threshold, sensitivity: $sensitivity");
       // Ignore very small movements (noise)
       if (dx.abs() < threshold) dx = 0;
@@ -99,7 +77,7 @@ dy *= acceleration;
           //   'Sent motion data: ${jsonEncode(motionData)}');
         }
 
-        sendTimer = Timer(Duration(milliseconds: 80), () {});
+        sendTimer = Timer(Duration(milliseconds: 50), () {});
       }
     });
   }
@@ -126,11 +104,16 @@ dy *= acceleration;
 
   @override
   Widget build(BuildContext context) {
-Timer? _actionCooldownTimer;
-    Timer? _scrollThrottleTimer;
-double? _latestScrollDy;
+Timer? actionCooldownTimer;
+    Timer? scrollThrottleTimer;
+double? latestScrollDy;
     return  PopScope(
-      canPop: true,
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          widget.onBack();
+        }
+      },
       child: Scaffold(
         
           backgroundColor: Color(0xFF0D1117),
@@ -165,10 +148,10 @@ double? _latestScrollDy;
                   decoration: BoxDecoration(
                     color: Color(0xFF21262D),
                     borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                    border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blueAccent.withOpacity(0.1),
+                        color: Colors.blueAccent.withValues(alpha: 0.1),
                         blurRadius: 10,
                         offset: Offset(0, 5),
                       ),
@@ -185,7 +168,7 @@ double? _latestScrollDy;
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.greenAccent.withOpacity(0.5),
+                              color: Colors.greenAccent.withValues(alpha: 0.5),
                               blurRadius: 10,
                               spreadRadius: 2,
                             ),
@@ -217,8 +200,8 @@ double? _latestScrollDy;
               GestureDetector(
         onPanUpdate: (details) {
        isPerformingAction = true;
-      _actionCooldownTimer?.cancel(); // Cancel any previous 
-      _actionCooldownTimer = Timer(Duration(milliseconds: 300), () {
+      actionCooldownTimer?.cancel(); // Cancel any previous 
+      actionCooldownTimer = Timer(Duration(milliseconds: 300), () {
         isPerformingAction = false;
       });
       
@@ -226,37 +209,37 @@ double? _latestScrollDy;
       double scrollDy = rawScrollDy.clamp(-3.0, 3.0);
       
       if (scrollDy.abs() > 0.1) {
-        _latestScrollDy = scrollDy;
+        latestScrollDy = scrollDy;
       
-        if (_scrollThrottleTimer == null || !_scrollThrottleTimer!.isActive) {
+        if (scrollThrottleTimer == null || !scrollThrottleTimer!.isActive) {
           // Send immediately and start timer
           if (stompClient != null && stompClient!.connected) {
             stompClient!.send(
               destination: url,
               body: jsonEncode({
                 "action": "scroll",
-                "scroll_dy": _latestScrollDy,
+                "scroll_dy": latestScrollDy,
               }),
             );
-            print('Sent scroll: $_latestScrollDy');
+            print('Sent scroll: $latestScrollDy');
           }
       
-          _scrollThrottleTimer = Timer(Duration(milliseconds: 50), () {
+          scrollThrottleTimer = Timer(Duration(milliseconds: 50), () {
             // After 50ms, if new scroll value exists, send it
-            if (_latestScrollDy != null) {
+            if (latestScrollDy != null) {
               if (stompClient != null && stompClient!.connected) {
                 stompClient!.send(
                   destination: url,
                   body: jsonEncode({
                     "action": "scroll",
-                    "scroll_dy": _latestScrollDy,
+                    "scroll_dy": latestScrollDy,
                   }),
                 );
-                print('Sent throttled scroll: $_latestScrollDy');
+                print('Sent throttled scroll: $latestScrollDy');
               }
             }
-            _scrollThrottleTimer = null;
-            _latestScrollDy = null;
+            scrollThrottleTimer = null;
+            latestScrollDy = null;
           });
         }
       }
@@ -271,7 +254,7 @@ double? _latestScrollDy;
       decoration: BoxDecoration(
         color: Color(0xFF21262D),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -307,7 +290,7 @@ double? _latestScrollDy;
                             borderRadius: BorderRadius.circular(15),
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0xFF4A9EFF).withOpacity(0.3),
+                                color: Color(0xFF4A9EFF).withValues(alpha: 0.3),
                                 blurRadius: 10,
                                 offset: Offset(0, 5),
                               ),
@@ -350,7 +333,7 @@ double? _latestScrollDy;
                             borderRadius: BorderRadius.circular(15),
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0xFFFF6B6B).withOpacity(0.3),
+                                color: Color(0xFFFF6B6B).withValues(alpha: 0.3),
                                 blurRadius: 10,
                                 offset: Offset(0, 5),
                               ),

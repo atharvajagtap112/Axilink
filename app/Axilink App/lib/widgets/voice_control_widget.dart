@@ -10,11 +10,11 @@ class VoiceControlWidget extends StatefulWidget {
   final VoidCallback?  onClose;
   
   const VoiceControlWidget({
-    Key? key,
+    super.key,
     required this. stompClient,
     required this.sessionCode,
     this. onClose,
-  }) : super(key: key);
+  });
   
   @override
   State<VoiceControlWidget> createState() => _VoiceControlWidgetState();
@@ -219,7 +219,7 @@ Widget build(BuildContext context) {
   return Container(
     padding:  const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.black.withOpacity(0.5),
+      color: Colors.black.withValues(alpha: 0.5),
       borderRadius: BorderRadius. circular(16),
     ),
     // ✅ Add constraint to prevent overflow
@@ -253,7 +253,7 @@ Widget build(BuildContext context) {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.2),
+                    color: Colors.blue.withValues(alpha: 0.2),
                     borderRadius: BorderRadius. circular(8),
                   ),
                   child: const Text(
@@ -305,7 +305,7 @@ Widget build(BuildContext context) {
                                 boxShadow: [
                                   BoxShadow(
                                     color: (_isListening ? Colors.red :  Colors.blueAccent)
-                                        .withOpacity(0.4),
+                                        .withValues(alpha: 0.4),
                                     blurRadius: 20,
                                     spreadRadius: 5,
                                   ),
@@ -375,10 +375,10 @@ Widget build(BuildContext context) {
                 Container(
                   padding:  const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blueAccent.withOpacity(0.1),
+                    color: Colors.blueAccent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     border:  Border.all(
-                      color: Colors.blueAccent. withOpacity(0.3),
+                      color: Colors.blueAccent. withValues(alpha: 0.3),
                     ),
                   ),
                   child: Column(
@@ -422,7 +422,7 @@ Widget _buildCommandChip(String text) {
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical:  4),
     decoration: BoxDecoration(
-      color: Colors.blueAccent.withOpacity(0.2),
+      color: Colors.blueAccent.withValues(alpha: 0.2),
       borderRadius: BorderRadius.circular(4),
     ),
     child: Text(

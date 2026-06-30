@@ -1,6 +1,5 @@
 import 'dart:convert';
-import 'dart:typed_data';
-import 'package:air_pointer/Services/azure_vision_service.dart';
+import 'package:air_pointer/Services/mlkit_ocr_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:stomp_dart_client/stomp.dart';
@@ -14,19 +13,19 @@ class OcrOverlayWidget extends StatefulWidget {
   final String? sessionCode;        // ✅ Add session code
   
   const OcrOverlayWidget({
-    Key?  key,
+    super.key,
     this.screenImage,
     this.onClose,
     this.stompClient,
     this.sessionCode,
-  }) : super(key: key);
+  });
   
   @override
   State<OcrOverlayWidget> createState() => _OcrOverlayWidgetState();
 }
 
 class _OcrOverlayWidgetState extends State<OcrOverlayWidget> {
-  final AzureVisionService _visionService = AzureVisionService();
+  final MlkitOcrService _visionService = MlkitOcrService();
   
   bool _isProcessing = false;
   String _extractedText = '';
@@ -40,6 +39,12 @@ class _OcrOverlayWidgetState extends State<OcrOverlayWidget> {
     _initializeService();
   }
   
+  @override
+  void dispose() {
+    _visionService.dispose();
+    super.dispose();
+  }
+
   void _initializeService() {
     _visionService.onTextExtracted = (text) {
       if (mounted) {
@@ -179,10 +184,10 @@ class _OcrOverlayWidgetState extends State<OcrOverlayWidget> {
         maxHeight: MediaQuery.of(context).size.height * 0.8,  // ✅ Limit height
       ),
       decoration: BoxDecoration(
-        color: Colors.black. withOpacity(0.5),
+        color: Colors.black. withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.purpleAccent.withOpacity(0.3),
+          color: Colors.purpleAccent.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -215,11 +220,11 @@ class _OcrOverlayWidgetState extends State<OcrOverlayWidget> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.purple.withOpacity(0.2),
+                        color: Colors.purple.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text(
-                        'Azure AI',
+                        'On-device',
                         style: TextStyle(
                           color: Colors.purpleAccent,
                           fontSize: 10,
@@ -275,9 +280,9 @@ class _OcrOverlayWidgetState extends State<OcrOverlayWidget> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color:  Colors.red.withOpacity(0.1),
+                        color:  Colors.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red. withOpacity(0.3)),
+                        border: Border.all(color: Colors.red. withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
@@ -368,10 +373,10 @@ class _OcrOverlayWidgetState extends State<OcrOverlayWidget> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.purpleAccent.withOpacity(0.1),
+                        color: Colors.purpleAccent.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border. all(
-                          color: Colors.purpleAccent.withOpacity(0.3),
+                          color: Colors.purpleAccent.withValues(alpha: 0.3),
                         ),
                       ),
                       child:  const Column(
@@ -379,7 +384,7 @@ class _OcrOverlayWidgetState extends State<OcrOverlayWidget> {
                           Icon(Icons.info_outline, color: Colors.purpleAccent),
                           SizedBox(height: 8),
                           Text(
-                            'Tap "Extract Text" to capture a high-quality\nscreenshot and use Azure AI Vision to\nrecognize and extract all text.',
+                            'Tap "Extract Text" to capture a high-quality\nscreenshot and use on-device ML Kit OCR to\nrecognize and extract all text.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white70,

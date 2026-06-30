@@ -1,15 +1,8 @@
-import 'dart:async';
 
 import 'package:air_pointer/connectionSelectionScreen.dart';
-import 'package:air_pointer/homepage.dart';
-import 'package:air_pointer/mouse_controller.dart';
-import 'package:air_pointer/qr_code_screen%20.dart';
+
 import 'package:flutter/material.dart';
-import 'package:sensors_plus/sensors_plus.dart';
-import 'package:stomp_dart_client/stomp.dart';
-import 'package:stomp_dart_client/stomp_config.dart';
-import 'package:stomp_dart_client/stomp_frame.dart';
-import 'dart:convert';
+
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
