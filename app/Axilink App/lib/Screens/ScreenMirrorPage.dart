@@ -532,21 +532,18 @@ class _ScreenMirrorPageState extends State<ScreenMirrorPage> {
               behavior: HitTestBehavior.opaque,
               onDoubleTap: () {
                 if (_showKeyboard || _isScrolling) return;
-                
-                final renderBox = context.findRenderObject() as RenderBox;
-                
+
                 // Use the current tap position for double tap instead of the start position
                 // This is the key fix! Use _lastTapPosition instead of _touchStartPosition
-                final tapPosition = _lastTapPosition ?? Offset(renderBox.size.width / 2, renderBox.size.height / 2);
-                _sendTouchEvent(tapPosition, renderBox.size, 'double_click');
+                final tapPosition = _lastTapPosition ?? Offset(areaSize.width / 2, areaSize.height / 2);
+                _sendTouchEvent(tapPosition, areaSize, 'double_click');
               },
               onLongPress: () {
                 if (_showKeyboard || _isScrolling || _isPotentialScroll) return;
-                
-                final renderBox = context.findRenderObject() as RenderBox;
+
                 // Also use _lastTapPosition here for consistency
-                final tapPosition = _lastTapPosition ?? Offset(renderBox.size.width / 2, renderBox.size.height / 2);
-                _sendTouchEvent(tapPosition, renderBox.size, 'right_click');
+                final tapPosition = _lastTapPosition ?? Offset(areaSize.width / 2, areaSize.height / 2);
+                _sendTouchEvent(tapPosition, areaSize, 'right_click');
               },
               child: Container(color: Colors.transparent),
             ),
@@ -639,13 +636,15 @@ if (_showOcrOverlay && _imageBytes != null)
     ),
   ),
 
-          
+
       ],
+        );
+      },
     );
   }
 
 
-  
+
     Widget _buildToolButton({
     required IconData icon,
     required bool isActive,

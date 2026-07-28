@@ -52,6 +52,10 @@ dependencies:
 
   # On-device OCR (replaces Azure Vision for text extraction)
   google_mlkit_text_recognition: ^0.13.0
+
+  # On-device speech-to-text (replaces Azure Speech). Uses the phone's native
+  # speech engine — no API key, no network round-trip.
+  speech_to_text: ^7.0.0
  
 
 dev_dependencies:

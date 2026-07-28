@@ -73,11 +73,14 @@ class RemoteControlClient:
         self.flip_x_coordinates = False
         self.flip_y_coordinates = False
 
-        # HARDCODED: Fine-tuning values as specified
-        self.scaling_factor_x = 1.16  # X scale = 1.16
-        self.scaling_factor_y = 1.0  # Y scale = 1.00
-        self.offset_x = 0.0  # X offset = 0.00
-        self.offset_y = 0.0  # Y offset = 0.00
+        # Touch calibration (percentage domain). These stay at 1.0/0.0 because the
+        # app now maps touches against the real displayed image rectangle
+        # (letterbox-aware), so no per-device scaling is required. They remain
+        # here only as optional manual fine-tuning knobs.
+        self.scaling_factor_x = 1.0  # X scale
+        self.scaling_factor_y = 1.0  # Y scale
+        self.offset_x = 0.0  # X offset (percentage, not pixels)
+        self.offset_y = 0.0  # Y offset (percentage, not pixels)
 
 
         self.root = tk.Tk()
@@ -369,7 +372,7 @@ class RemoteControlClient:
 
         # Add calibration status label
         calib_status = tk.Label(scrollable_frame,
-                                text=f"Touch Calibration: X-Scale: 1.16, Y-Scale: 1.00",
+                                text=f"Touch Mapping: Auto (aspect-ratio aware)",
                                 font=("Arial", 8), bg='#2c3e50', fg='#7f8c8d')
         calib_status.pack(pady=2)
 
@@ -472,9 +475,11 @@ class RemoteControlClient:
             # Create a fresh MSS instance for thread safety
             with mss.mss() as sct:
                 monitor = sct.monitors[idx]
-                # Update offset for the selected monitor
-                self.offset_x = monitor['left']
-                self.offset_y = monitor['top']
+                # NOTE: do NOT overwrite self.offset_x/offset_y here. Those are
+                # percentage-domain calibration offsets used in map_touch_coordinates.
+                # The monitor's pixel position is applied separately via mon_left/
+                # mon_top (from self.monitor_info), so writing pixel values here would
+                # push every touch off-screen on non-primary monitors.
 
                 # Update monitor aspect ratio
                 self.monitor_aspect_ratio = monitor['width'] / monitor['height']

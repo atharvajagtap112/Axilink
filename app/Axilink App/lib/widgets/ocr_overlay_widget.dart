@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:air_pointer/Services/mlkit_ocr_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,8 +30,7 @@ class _OcrOverlayWidgetState extends State<OcrOverlayWidget> {
   String _extractedText = '';
   List<TextRegion> _regions = [];
   String?  _error;
-  Uint8List? _highQualityImage;  // ✅ Store high-quality image
-  
+
   @override
   void initState() {
     super.initState();
@@ -73,93 +71,44 @@ class _OcrOverlayWidgetState extends State<OcrOverlayWidget> {
     };
   }
   
-  /// ✅ Request high-quality screenshot from desktop
-  Future<void> _requestHighQualityScreenshot() async {
-    if (widget.stompClient == null || widget.sessionCode == null) {
-      // Fallback to current image
-      await _extractTextFromCurrentImage();
-      return;
-    }
-    
-    setState(() {
-      _isProcessing = true;
-      _error = null;
-      _extractedText = '';
-    });
-    
-    try {
-      // Send request for high-quality screenshot
-      widget.stompClient!.send(
-        destination: '/app/ocr-screenshot/${widget.sessionCode}',
-        body: jsonEncode({
-          'quality': 95,  // High quality
-          'resize': 1.0,  // Full size
-        }),
-      );
-      
-      // Subscribe to response
-      widget.stompClient!.subscribe(
-        destination: '/topic/ocr-screenshot/${widget.sessionCode}',
-        callback: (frame) {
-          if (frame.body != null) {
-            try {
-              final data = jsonDecode(frame.body! );
-              if (data['image'] != null) {
-                _highQualityImage = base64Decode(data['image']);
-                _extractText();
-              }
-            } catch (e) {
-              print('[OCR] Error parsing screenshot: $e');
-              setState(() {
-                _error = 'Failed to receive screenshot';
-                _isProcessing = false;
-              });
-            }
-          }
-        },
-      );
-      
-      // Timeout after 10 seconds
-      Future.delayed(const Duration(seconds: 10), () {
-        if (_isProcessing && _highQualityImage == null) {
-          // Fallback to current image
-          _extractTextFromCurrentImage();
-        }
-      });
-      
-    } catch (e) {
-      print('[OCR] Error requesting screenshot: $e');
-      await _extractTextFromCurrentImage();
-    }
-  }
-  
-  /// Extract text from current low-quality image (fallback)
-  Future<void> _extractTextFromCurrentImage() async {
-    if (widget.screenImage == null) {
+  /// Run OCR on the frame that is already on the device.
+  ///
+  /// The mirror frame is local, so there is no need for a network round-trip —
+  /// we feed it straight to on-device ML Kit. We drive the UI off the awaited
+  /// result (not just the callbacks) so the spinner can never get stuck when a
+  /// frame happens to contain no recognizable text.
+  Future<void> _runOcr() async {
+    final image = widget.screenImage;
+    if (image == null) {
       setState(() {
-        _error = 'No screen image available';
+        _error = 'No screen image yet. Wait for the mirror to load, then retry.';
         _isProcessing = false;
       });
       return;
     }
-    
+
     setState(() {
       _isProcessing = true;
       _error = null;
       _extractedText = '';
+      _regions = [];
     });
-    
-    await _visionService.extractTextFromImage(widget.screenImage!);
-  }
-  
-  /// Extract text using high-quality image
-  Future<void> _extractText() async {
-    if (_highQualityImage == null) {
-      await _extractTextFromCurrentImage();
-      return;
-    }
-    
-    await _visionService.extractTextFromImage(_highQualityImage! );
+
+    final result = await _visionService.extractTextFromImage(image);
+
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = false;
+      if (result == null) {
+        _error = 'OCR failed. Please try again.';
+      } else {
+        _extractedText = result.text;
+        _regions = result.regions;
+        if (result.text.isEmpty) {
+          _error = 'No readable text found on the current screen.';
+        }
+      }
+    });
   }
   
   void _copyToClipboard() {
@@ -255,7 +204,7 @@ class _OcrOverlayWidgetState extends State<OcrOverlayWidget> {
                 children: [
                   // Extract button
                   ElevatedButton.icon(
-                    onPressed: _isProcessing ? null : _requestHighQualityScreenshot,
+                    onPressed: _isProcessing ? null : _runOcr,
                     icon: _isProcessing
                         ? const SizedBox(
                             width: 20,

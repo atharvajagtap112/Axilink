@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:stomp_dart_client/stomp.dart';
-import '../services/azure_speech_service.dart';
+import '../services/on_device_speech_service.dart';
 
 /// Voice Control Widget for hands-free desktop control
 class VoiceControlWidget extends StatefulWidget {
@@ -22,8 +22,8 @@ class VoiceControlWidget extends StatefulWidget {
 
 class _VoiceControlWidgetState extends State<VoiceControlWidget>
     with SingleTickerProviderStateMixin {
-  final AzureSpeechService _speechService = AzureSpeechService();
-  
+  final OnDeviceSpeechService _speechService = OnDeviceSpeechService();
+
   bool _isListening = false;
   String _statusText = 'Tap to speak';
   String _lastCommand = '';
@@ -54,9 +54,19 @@ class _VoiceControlWidgetState extends State<VoiceControlWidget>
     _speechService.onVoiceCommand = _handleVoiceCommand;
     _speechService.onTranscription = _handleTranscription;
     _speechService.onError = _handleError;
-    
+    // The native recognizer stops on its own after a pause; keep the UI in sync.
+    _speechService.onListeningChanged = (listening) {
+      if (!mounted) return;
+      setState(() {
+        _isListening = listening;
+        if (!listening && _statusText == 'Listening...') {
+          _statusText = 'Tap to speak';
+        }
+      });
+    };
+
     _hasPermission = await _speechService.checkPermission();
-    if (!_hasPermission) {
+    if (!_hasPermission && mounted) {
       setState(() {
         _statusText = 'Microphone permission required';
       });
@@ -192,25 +202,22 @@ void _executeCommand(String command) {
     }
     
     if (_isListening) {
-      // Stop recording and process
+      // Stop listening; the final result (if any) is already handled live.
       setState(() {
         _isListening = false;
-        _statusText = 'Processing...';
-      });
-      
-      await _speechService.stopRecordingAndProcess();
-      
-      setState(() {
         _statusText = 'Tap to speak';
       });
+
+      await _speechService.stopListening();
     } else {
-      // Start recording
+      // Start a streaming listening session.
       setState(() {
         _isListening = true;
         _statusText = 'Listening...';
+        _lastTranscription = '';
       });
-      
-      await _speechService.startRecording();
+
+      await _speechService.startListening();
     }
   }
   
@@ -257,7 +264,7 @@ Widget build(BuildContext context) {
                     borderRadius: BorderRadius. circular(8),
                   ),
                   child: const Text(
-                    'Azure AI',
+                    'On-device',
                     style: TextStyle(
                       color: Colors.blueAccent,
                       fontSize:  10,
